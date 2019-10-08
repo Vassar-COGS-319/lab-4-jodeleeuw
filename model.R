@@ -54,23 +54,23 @@ layout(matrix(1:10, nrow=2, byrow=T))
 # 0
 draw.stimulus(c(1,1,1,1,1,-1,1))
 # 1
-draw.stimulus(...)
+draw.stimulus(c(-1,-1,1,1,-1,-1,-1))
 # 2
-draw.stimulus(...)
+draw.stimulus(c(1,-1,-1,1,1,1,1))
 # 3
-draw.stimulus(...)
+draw.stimulus(c(-1,-1,1,1,1,1,1))
 # 4
-draw.stimulus(...)
+draw.stimulus(c(-1,1,1,1,-1,1,-1))
 # 5
-draw.stimulus(...)
+draw.stimulus(c(-1,1,1,-1,1,1,1))
 # 6
-draw.stimulus(...)
+draw.stimulus(c(1,1,1,-1,1,1,-1))
 # 7
-draw.stimulus(...)
+draw.stimulus(c(-1,-1,1,1,-1,-1,1))
 # 8
-draw.stimulus(...)
+draw.stimulus(c(1,1,1,1,1,1,1))
 # 9
-draw.stimulus(...)
+draw.stimulus(c(-1,1,1,1,-1,1,1))
 
 #### Setting up the connection weights ####
 
@@ -89,8 +89,18 @@ draw.stimulus(...)
 
 # row is a feature, column is a digit.
 feature.to.digit.connections <- matrix(
-  # ... you fill in this part ...
-)
+  c(
+    c(1,1,1,1,1,-1,1),
+    c(-1,-1,1,1,-1,-1,-1),
+    c(1,-1,-1,1,1,1,1),
+    c(-1,-1,1,1,1,1,1),
+    c(-1,1,1,1,-1,1,-1),
+    c(-1,1,1,-1,1,1,1),
+    c(1,1,1,-1,1,1,-1),
+    c(-1,-1,1,1,-1,-1,1),
+    c(1,1,1,1,1,1,1),
+    c(-1,1,1,1,-1,1,1)
+  ), nrow=7)
 
 # If you've done this correctly then this chunk of code should draw a 2, because
 # the third column of the matrix represents the connections for the digit 2.
@@ -123,7 +133,7 @@ cycles <- 10
 
 # We'll represent the input to the model as 7 features with 1s and -1s indicating the
 # presence and absence of a feature.
-input <- c(-1,1,1,1,-1,1,-1)
+input <- c(0,1,1,1,0,1,0)
 draw.stimulus(input) # visualize the input.
 
 # First, let's define a vector to record the activity of the 10 digit units. We'll
@@ -171,7 +181,16 @@ digit.units <- rep(0,10)
 # Repeat the steps above on each cycle until the number of desired cycles is reached.
         
 for(cycle in 1:cycles){
- # ... you fill in this part ...
+  for(i in 1:10){
+    digit.units[i] <- digit.units[i] + sum((excitatory.weight*feature.to.digit.connections[,i]) * input)
+    if(digit.units[i] < 0) { digit.units[i] <- 0 }
+  }
+  new.digit.units <- digit.units
+  for(i in 1:10){
+    new.digit.units[i] <- new.digit.units[i] + sum(digit.units[-i])*inhibitory.weight
+    if(new.digit.units[i] < 0) { new.digit.units[i] <- 0 }
+  }
+  digit.units <- new.digit.units
 }
         
 # After running the model for the desired number of cycles, the digit.units vector will
@@ -197,10 +216,35 @@ response.probability <- digit.units / sum(digit.units)
 
 # 1. What happens when you set the inhibitory.weight to 0, removing the inhibitory connections?
 
+# The excitatory connections accumulate over each cycle, but the relative activation of each digit unit
+# is the same as after the first cycle. This lack of competition between digit units makes the network
+# less confident in its judgment (the response probabilities are more similar) and there is only a 35%
+# chance of correctly identifying the input as a 4.
+
 # 2. Try showing the model various "partial" digits, where you remove or add a feature to a correct digit.
 #    Does the model still make the correct classification? There are probably cases where it does, and cases
 #    where it doesn't. See if you can find an example of each. Explain what is happening.
 
+# Obviously, cases like removing the center line of an 8 will cause the network to see a 0.
+
+# One interesting case is that removing the bottom right line segment of a 4 makes the network
+# MORE likely to judge the stimulus as a 4. (input <- c(-1,1,-1,1,-1,1,-1)). This
+# is because the partial 4 is even less like a 9 than it was before, so the inhibitory
+# strength of the 9 is diminished and the 4 wins out.
+
+# Another interesting case is when there are no line segments in the input. The network
+# gives the response probability of 100% that this is a 1. At first this seems absurd, 
+# but recall that the network treats the absence of a line segment as evidence too, and a
+# 1 has the fewest line segments.
+
 # 3. Change the input patterns you give the model so that instead of using -1s to represent the
 #    absence of a feature, you use 0. Compare the model's predictions in this case to the case with
 #    -1s. What's different, and why?
+
+# Now the model does not treat the absence of a feature as evidence for digits that lack that
+# feature. The model only considers the presence of a feature to be evidence. This makes digits
+# that contain lots of features (8, 0) to be more likely in general. For example showing
+# the network a perfect 4 creates a three-way tie in response probability between a 4, an 8, and a 9.
+# All of those digits contain the set of features in the 4. It's as if there is a piece
+# of paper covering up the parts of the digit that are "off", and the model isn't sure
+# if there is a feature there or not.
